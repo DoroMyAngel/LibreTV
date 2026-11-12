@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "libretv-workers-next",
+  "main": ".open-next/worker.js",
+  "upload_source_maps": true,
+  "compatibility_date": "2026-11-13",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
