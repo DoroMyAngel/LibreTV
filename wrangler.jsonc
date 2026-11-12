@@ -1,17 +1,24 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "libretv-next",
-  "main": ".open-next/worker.js",
-  "upload_source_maps": true,
-  "compatibility_date": "2026-11-13",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
-  "assets": {
-    "directory": ".open-next/assets",
-    "binding": "ASSETS"
+  // ...
+  "images": {
+    "binding": "IMAGES"
   },
-  "observability": {
-    "enabled": true
-  }
+  "r2_buckets": [
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "libretv-opennext-cache"
+    }
+  ],
+  "unsafe": {
+    "bindings": [
+      {
+        "name": "WORKER_SELF_REFERENCE",
+        "type": "service",
+        "service": "libretv-next",
+        "environment": "production",
+        "entrypoint": "default"
+      }
+    ]
+  },
+  // ...
 }
