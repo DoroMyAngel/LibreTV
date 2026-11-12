@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "libretv-workers-next",
+  "name": "libretv-next",
   "main": ".open-next/worker.js",
   "upload_source_maps": true,
   "compatibility_date": "2026-11-13",
