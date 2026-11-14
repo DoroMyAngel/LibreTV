@@ -86,7 +86,15 @@ export default function StreamTestPage() {
     setStatus('当前浏览器不支持 HLS 播放');
   };
 
-  useEffect(() => () => stop(), []);
+  useEffect(() => () => {
+    hlsRef.current?.destroy();
+    const video = videoRef.current;
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    }
+  }, []);
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 p-4">
