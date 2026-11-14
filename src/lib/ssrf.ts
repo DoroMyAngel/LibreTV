@@ -2,6 +2,10 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LookupAddress } from 'node:dns';
 import { lookup as callbackLookup } from 'node:dns';
 import dns from 'node:dns/promises';
+
+/** Cloudflare Workers 提供 WebSocketPair；Node.js 本地/服务器运行环境没有该全局对象。 */
+const IS_CLOUDFLARE_WORKERS =
+  typeof (globalThis as typeof globalThis & { WebSocketPair?: unknown }).WebSocketPair === 'function';
 import { Agent, buildConnector, fetch as undiciFetch } from 'undici';
 
 /** 去掉 URL.hostname 对 IPv6 附加的方括号（"[::1]" → "::1"） */
@@ -63,6 +67,20 @@ export async function isBlockedByDNS(urlString: string): Promise<boolean> {
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(':')) {
       return isPrivateIP(hostname);
     }
+    if (IS_CLOUDFLARE_WORKERS) {
+      // Workers 的 node:dns.lookup / node:dns.lookupService 不受支持，会抛出
+      // ENOTFOUND queryA。Workers 应使用 DNS-over-HTTPS resolver（resolve4/resolve6）。
+      // 分别查询 A/AAAA：某一地址族没有记录时，不应掩盖另一地址族的有效结果。
+      const results = await Promise.allSettled([
+        dns.resolve4(hostname),
+        dns.resolve6(hostname),
+      ]);
+      const addresses = results.flatMap((result) =>
+        result.status === 'fulfilled' ? result.value : []
+      );
+      return addresses.some((address) => isPrivateIP(address));
+    }
+
     const result = await dns.lookup(hostname, { all: true });
     return result.some((r) => isPrivateIP(r.address));
   } catch {
@@ -240,7 +258,15 @@ export function installFetchSSRFProtection(): void {
       return originalFetch(input, init);
     }
 
-    // 在受保护作用域内，如果未提供专属 dispatcher，自动注入安全专用的 Agent
+    if (IS_CLOUDFLARE_WORKERS) {
+      // Workers 原生 fetch 由 workerd 负责 DNS、TLS 和出站连接；不要使用
+      // Node.js callback lookup / Undici Agent（Workers 中 lookup 不可用）。
+      // 同时移除非标准 dispatcher 字段，避免将 Node Agent 传给原生 fetch。
+      const { dispatcher: _dispatcher, ...workerInit } = init ?? {};
+      return originalFetch(input, workerInit);
+    }
+
+    // Node.js 环境继续使用带连接级 DNS 校验的 Undici Agent
     const agent = createSSRFAgent({ allowPrivate: ctx.allowPrivate });
     try {
       // input/init 走 undici 自己的重载签名：DOM 的 Request 类型与 undici 的
