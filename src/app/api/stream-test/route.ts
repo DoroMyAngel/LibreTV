@@ -46,6 +46,34 @@ export async function GET(req: Request) {
       }
     );
 
+    // 错误响应不能当作 HLS manifest 重写；保留上游状态码、正文和诊断头，
+    // 便于区分上游返回的 HTTP 错误与 Worker fetch 抛出的异常。
+    if (!upstream.ok) {
+      const errorHeaders = new Headers({
+        'Cache-Control': 'no-store, no-transform',
+        'X-Accel-Buffering': 'no',
+      });
+      for (const name of [
+        'content-type',
+        'content-length',
+        'content-range',
+        'date',
+        'server',
+        'cf-ray',
+        'cf-error-type',
+        'cf-error-origin',
+        'location',
+      ]) {
+        const value = upstream.headers.get(name);
+        if (value) errorHeaders.set(name, value);
+      }
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: errorHeaders,
+      });
+    }
+
     const contentType = upstream.headers.get('content-type') || '';
     const pathname = new URL(finalUrl).pathname.toLowerCase();
     const isM3u8 =
